@@ -2,11 +2,11 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(express.json());
 
 app.use(
   cors({
@@ -14,6 +14,8 @@ app.use(
     credentials: true,
   })
 );
+app.use(express.json());
+app.use(cookieParser());
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5q2fm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -27,6 +29,27 @@ const client = new MongoClient(uri, {
   },
 });
 
+// Middleware for verifyToken
+
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log("Token in the middleware: ", token);
+
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized!" });
+  }
+
+  jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      // console.log(err);
+      return res.status(401).send({ message: "Unauthorized" });
+    }
+    // console.log("Verified Token: ", decoded);
+    req.decoded = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -37,11 +60,8 @@ async function run() {
       .collection("usersPostedJobs");
 
     // Create JWT token
-
     app.post("/jwt", async (req, res) => {
       const email = req.body;
-      console.log(email);
-
       const token = jwt.sign(email, process.env.TOKEN_SECRET, {
         expiresIn: "1h",
       });
@@ -50,7 +70,7 @@ async function run() {
         .cookie("token", token, {
           httpOnly: true,
           secure: false,
-          sameSite: "none",
+          sameSite: "strict",
         })
         .send({ success: true });
     });
@@ -67,10 +87,16 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/myPostedJobs", async (req, res) => {
-      const email = req.query.email;
-      const filter = { email };
-      const result = await usersPostedJobsCollection.find(filter).toArray();
+    app.get("/myPostedJobs", verifyToken, async (req, res) => {
+      // console.log("verified token from middleware", req.decoded);
+      // console.log("My token: ", req.cookies.token);
+
+      if (req.query?.email !== req.decoded.email) {
+        return res.status(403).send({ message: "Forbidden Access!" });
+      }
+      const email = req.query?.email;
+      const query = { email };
+      const result = await usersPostedJobsCollection.find(query).toArray();
       res.send(result);
     });
 
