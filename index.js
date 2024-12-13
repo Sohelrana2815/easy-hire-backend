@@ -1,13 +1,19 @@
 const express = require("express");
+const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
-const app = express();
 
 // Middleware
 app.use(express.json());
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5q2fm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -26,41 +32,55 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
-    const jobsCollection = client.db("EASY_HIRE_DB").collection("jobs");
-    const myPostedJobsCollection = client
+    const usersPostedJobsCollection = client
       .db("EASY_HIRE_DB")
-      .collection("myPostedJobs");
-    app.get("/jobs", async (req, res) => {
-      const result = await jobsCollection.find().toArray();
-      res.send(result);
+      .collection("usersPostedJobs");
+
+    // Create JWT token
+
+    app.post("/jwt", async (req, res) => {
+      const email = req.body;
+      console.log(email);
+
+      const token = jwt.sign(email, process.env.TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: false,
+          sameSite: "none",
+        })
+        .send({ success: true });
     });
 
-    app.get("/jobs/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const result = await jobsCollection.findOne(filter);
-      res.send(result);
-    });
-
-    app.post("/myPostedJobs", async (req, res) => {
+    app.post("/usersPostedJobs", async (req, res) => {
       const job = req.body;
       console.log(job);
+      const result = await usersPostedJobsCollection.insertOne(job);
+      res.send(result);
+    });
 
-      const result = await myPostedJobsCollection.insertOne(job);
+    app.get("/allUsersJobs", async (req, res) => {
+      const result = await usersPostedJobsCollection.find().toArray();
       res.send(result);
     });
 
     app.get("/myPostedJobs", async (req, res) => {
-      const result = await myPostedJobsCollection.find().toArray();
+      const email = req.query.email;
+      const filter = { email };
+      const result = await usersPostedJobsCollection.find(filter).toArray();
       res.send(result);
     });
 
     app.get("/myPostedJobs/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
-      const result = await myPostedJobsCollection.findOne(filter);
+      const result = await usersPostedJobsCollection.findOne(filter);
       res.send(result);
     });
+
     app.patch("/myPostedJobs/:id", async (req, res) => {
       const id = req.params.id;
       const myPostedJob = req.body;
@@ -78,14 +98,17 @@ async function run() {
         },
       };
 
-      const result = await myPostedJobsCollection.updateOne(filter, updatedDoc);
+      const result = await usersPostedJobsCollection.updateOne(
+        filter,
+        updatedDoc
+      );
       res.send(result);
     });
 
     app.delete("/myPostedJobs/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
-      const result = await myPostedJobsCollection.deleteOne(filter);
+      const result = await usersPostedJobsCollection.deleteOne(filter);
       res.send(result);
     });
     // Send a ping to confirm a successful connection
