@@ -18,6 +18,7 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -49,6 +50,14 @@ const verifyToken = async (req, res, next) => {
   });
 };
 
+// Cookie options
+
+const cookieOption = {
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+  secure: process.env.NODE_ENV === "production" ? true : false,
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -69,13 +78,7 @@ async function run() {
         expiresIn: "1h",
       });
 
-      res
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: false,
-          sameSite: "strict",
-        })
-        .send({ success: true });
+      res.cookie("token", token, cookieOption).send({ success: true });
     });
 
     // CLEAR COOKIE
@@ -158,7 +161,6 @@ async function run() {
 
     app.post("/bidedJobs", verifyToken, async (req, res) => {
       const myBidedJob = req.body;
-      // console.log(myBidedJob);
       const result = await bidedJobsCollection.insertOne(myBidedJob);
       res.send(result);
     });
