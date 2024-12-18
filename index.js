@@ -84,15 +84,14 @@ async function run() {
     // CLEAR COOKIE
 
     app.post("/clearCookie", async (req, res) => {
-      const email = req.body;
-      console.log(email);
-      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+      res
+        .clearCookie("token", { ...cookieOption, maxAge: 0 })
+        .send({ success: true });
     });
 
     // USER RELATED API'S
     app.post("/usersPostedJobs", async (req, res) => {
       const job = req.body;
-      console.log(job);
       const result = await usersPostedJobsCollection.insertOne(job);
       res.send(result);
     });
@@ -109,7 +108,6 @@ async function run() {
     });
 
     app.get("/myPostedJobs", verifyToken, async (req, res) => {
-      // console.log("Decoded info: ", req.decoded);
       if (req.query?.email !== req.decoded?.email) {
         return res.status(403).send({ message: "Forbidden Access!" });
       }
@@ -129,8 +127,6 @@ async function run() {
     app.patch("/myPostedJobs/:id", async (req, res) => {
       const id = req.params.id;
       const myPostedJob = req.body;
-      console.log(myPostedJob, id);
-
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
