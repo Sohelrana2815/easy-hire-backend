@@ -57,6 +57,9 @@ async function run() {
     const usersPostedJobsCollection = client
       .db("EASY_HIRE_DB")
       .collection("usersPostedJobs");
+    const bidedJobsCollection = client
+      .db("EASY_HIRE_DB")
+      .collection("bidedJobs");
 
     // JWT RELATED API'S
 
@@ -93,6 +96,12 @@ async function run() {
 
     app.get("/allUsersJobs", async (req, res) => {
       const result = await usersPostedJobsCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/allUsersJobs/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await usersPostedJobsCollection.findOne(filter);
       res.send(result);
     });
 
@@ -144,6 +153,85 @@ async function run() {
       const result = await usersPostedJobsCollection.deleteOne(filter);
       res.send(result);
     });
+
+    // Bid job related api's
+
+    app.post("/bidedJobs", verifyToken, async (req, res) => {
+      const myBidedJob = req.body;
+      // console.log(myBidedJob);
+      const result = await bidedJobsCollection.insertOne(myBidedJob);
+      res.send(result);
+    });
+
+    app.get("/myBidJobs", verifyToken, async (req, res) => {
+      const { email, sort } = req.query;
+      const query = { email };
+
+      let options = {};
+
+      if (sort === "asc") {
+        options.sort = { status: 1 };
+      } else if (sort === "desc") {
+        options.sort = { status: -1 };
+      }
+
+      const result = await bidedJobsCollection.find(query, options).toArray();
+      res.send(result);
+    });
+
+    app.get("/bidRequests", verifyToken, async (req, res) => {
+      const jobOwnerEmail = req.query?.email;
+      const filter = { jobOwnerEmail };
+      const result = await bidedJobsCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    app.get("/bidRequests/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await bidedJobsCollection.findOne(filter).toArray();
+      res.send(result);
+    });
+
+    app.patch("/cancelBidRequest/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          status: "reject",
+        },
+      };
+      const result = await bidedJobsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/acceptBidRequest/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: "accept",
+        },
+      };
+
+      const result = await bidedJobsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/completeProject/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: "complete",
+        },
+      };
+
+      const result = await bidedJobsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     console.log(
